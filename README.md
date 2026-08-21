@@ -37,3 +37,16 @@ zip -r ../out/filter.zip object_filter/
 ## License
 
 GPL-3.0-or-later
+
+
+---
+
+## 🔗 Related Tools
+
+| Tool | Description |
+|------|-------------|
+| [STUKACH](https://github.com/abyrvalg379/STUKACH) | Pipeline asset validator for Blender |
+| [LAMPOCHKA](https://github.com/abyrvalg379/LAMPOCHKA) | Scene light manager |
+| [Switch_UDIM](https://github.com/abyrvalg379/Switch_UDIM) | Single ↔ UDIM texture switcher |
+| [FLOMASTER](https://github.com/abyrvalg379/FLOMASTER) | OCIO launcher for DCC apps |
+| [FILTER](https://github.com/abyrvalg379/FILTER) | Toggle visibility/selection by type, name, collection |
