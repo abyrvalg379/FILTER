@@ -1,0 +1,25 @@
+schema_version = "1.0.0"
+
+id = "object_filter"
+version = "1.1.0"
+name = "FILTER"
+tagline = "Toggle object visibility by type, name, or collection"
+maintainer = "Maksim Kovalev <mkova@users.noreply.github.com>"
+type = "add-on"
+
+blender_version_min = "4.2.0"
+
+license = ["SPDX:GPL-3.0-or-later"]
+copyright = ["2026 Maksim Kovalev"]
+
+tags = ["Object", "Visibility"]
+
+description = """
+Toggle object visibility and selectability by:
+- Object type (Mesh, Armature, Empty, Light, Camera)
+- Name pattern (case-insensitive)
+- Collection
+"""
+
+[permissions]
+files = "Read scene objects to toggle visibility"

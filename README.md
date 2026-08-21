@@ -1,0 +1,39 @@
+# FILTER
+
+Blender extension for quick object visibility management.
+
+## Features
+
+- Toggle visibility by object type (Mesh, Armature, Empty, Light, Camera)
+- Lock selection per type
+- Filter by name pattern (case-insensitive)
+- Filter by collection
+
+## Installation
+
+### Blender 4.2+ (Extension)
+
+1. Download `filter.zip` from [Releases](../../releases)
+2. Blender → Preferences → Get Extensions → Install from Disk → select `filter.zip`
+
+### Blender 3.0+ (Addon)
+
+1. Download `filter.zip` from [Releases](../../releases)
+2. Blender → Preferences → Add-ons → Install → select `filter.zip`
+
+## Usage
+
+1. Open Sidebar (N) → **FILTER** tab
+2. Use buttons next to each type to toggle visibility, select, or lock
+3. Enter name pattern and click Toggle/Select to filter by name
+
+## Build
+
+```bash
+cd work
+zip -r ../out/filter.zip object_filter/
+```
+
+## License
+
+GPL-3.0-or-later
