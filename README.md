@@ -1,5 +1,7 @@
 # FILTER
 
+![FILTER cover](work/screen/filter_cover.png)
+
 Blender extension for quick object visibility and modifier management.
 
 ## Features
