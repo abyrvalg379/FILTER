@@ -1,6 +1,6 @@
 # FILTER
 
-Blender extension for quick object visibility management.
+Blender extension for quick object visibility and modifier management.
 
 ## Features
 
@@ -8,6 +8,11 @@ Blender extension for quick object visibility management.
 - Lock selection per type
 - Filter by name pattern (case-insensitive)
 - Filter by collection
+- **By Modifier** — bulk manage modifiers across the scene: detect every modifier grouped by exact name or by type, with **Scene / Selected** scope toggle
+  - Bulk **Apply** with order-safe semantics: if the modifier is not first in a stack, modifiers above it are baked top-down first, so the result stays exactly the same (confirmation dialog appears only when such baking is needed)
+  - Bulk **Remove** and **Select** per modifier group
+  - Linked duplicates (Alt+D): shared mesh data is made single-user automatically before apply
+  - Library-linked objects are skipped
 
 ## Installation
 
@@ -53,5 +58,4 @@ GPL-3.0-or-later
 | [LAMPOCHKA](https://github.com/abyrvalg379/LAMPOCHKA) | Scene light manager |
 | [Switch_UDIM](https://github.com/abyrvalg379/Switch_UDIM) | Single ↔ UDIM texture switcher |
 | [FLOMASTER](https://github.com/abyrvalg379/FLOMASTER) | OCIO launcher for DCC apps |
-| [FILTER](https://github.com/abyrvalg379/FILTER) | Toggle visibility/selection by type, name, collection |
 | [KARUSELKA](https://github.com/abyrvalg379/karuselka) | Fast camera turntable rig: orbit or object spin |

@@ -1,9 +1,9 @@
 schema_version = "1.0.0"
 
 id = "object_filter"
-version = "1.1.0"
+version = "1.3.0"
 name = "FILTER"
-tagline = "Toggle object visibility by type, name, or collection"
+tagline = "Toggle visibility and bulk manage modifiers across the scene"
 maintainer = "Maksim Kovalev <mkova@users.noreply.github.com>"
 type = "add-on"
 
@@ -19,6 +19,7 @@ Toggle object visibility and selectability by:
 - Object type (Mesh, Armature, Empty, Light, Camera)
 - Name pattern (case-insensitive)
 - Collection
+- Modifier (detect across scene, bulk apply/remove)
 """
 
 [permissions]
