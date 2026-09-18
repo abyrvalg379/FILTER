@@ -4,6 +4,7 @@
 import bpy
 import os
 import tomllib
+from collections import Counter
 
 
 # --- Version (from manifest, for the panel header) ---
@@ -47,9 +48,23 @@ def is_type_hidden(obj_type):
     return True
 
 
+def is_type_render_hidden(obj_type):
+    for obj in bpy.data.objects:
+        if obj.type == obj_type and not obj.hide_render:
+            return False
+    return True
+
+
 def is_collection_hidden(collection):
     for obj in collection.objects:
         if not obj.hide_viewport:
+            return False
+    return True
+
+
+def is_collection_render_hidden(collection):
+    for obj in collection.objects:
+        if not obj.hide_render:
             return False
     return True
 
@@ -137,7 +152,59 @@ def get_modifier_groups(mode='NAME', objects=None):
     return result
 
 
-# --- Panel ---
+# настройки, которые не считаются «смыслом» модификатора при сверке
+_FP_SKIP_PROPS = {'name', 'type', 'show_expanded', 'show_viewport',
+                  'show_render', 'show_in_editmode', 'use_pin_to_last'}
+
+
+def mod_fingerprint(mod):
+    """Stable fingerprint of the modifier's meaningful settings."""
+    fp = []
+    for p in mod.bl_rna.properties:
+        pid = p.identifier
+        if pid in _FP_SKIP_PROPS or p.is_readonly:
+            continue
+        try:
+            val = getattr(mod, pid)
+        except AttributeError:
+            continue
+        is_array = getattr(p, 'is_array', False)
+        if p.type == 'POINTER':
+            fp.append((pid, val.name) if val else (pid, None))
+        elif p.type == 'BOOLEAN' and is_array:
+            fp.append((pid, tuple(val)))
+        elif p.type == 'FLOAT':
+            fp.append((pid, tuple(round(x, 5) for x in val) if is_array else round(val, 5)))
+        elif p.type == 'INT' and is_array:
+            fp.append((pid, tuple(val)))
+        else:
+            fp.append((pid, val))
+    return tuple(fp)
+
+
+def get_group_diffs(mod_groups, mode, objects):
+    """{group key: number of objects whose modifier settings differ
+    from the majority of the group}."""
+    diffs = {}
+    for key, display, mod_type, count in mod_groups:
+        fps = []
+        for obj in objects:
+            if obj.library is not None:
+                continue
+            for mod in obj.modifiers:
+                if (mode == 'NAME' and mod.name == key) or \
+                   (mode == 'TYPE' and mod.type == key):
+                    fps.append(mod_fingerprint(mod))
+                    break
+        if len(fps) > 1:
+            common = Counter(fps).most_common(1)[0][0]
+            outliers = sum(1 for f in fps if f != common)
+            if outliers:
+                diffs[key] = outliers
+    return diffs
+
+
+# --- Panel (parent header) ---
 
 class VIS_PT_panel(bpy.types.Panel):
     bl_label = _PANEL_LABEL
@@ -147,12 +214,20 @@ class VIS_PT_panel(bpy.types.Panel):
     bl_category = "FILTER"
 
     def draw(self, context):
+        pass  # только шапка с версией, содержимое — в суб-панелях
+
+
+class VIS_PT_type(bpy.types.Panel):
+    bl_label = "By Type"
+    bl_idname = "VIS_PT_type"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_category = "FILTER"
+    bl_parent_id = "VIS_PT_panel"
+    bl_order = 1
+
+    def draw(self, context):
         layout = self.layout
-
-        # --- By Type ---
-        box = layout.box()
-        box.label(text="By Type", icon='FILTER')
-
         types = [
             ('MESH', 'Mesh', 'MESH_DATA'),
             ('ARMATURE', 'Armature', 'ARMATURE_DATA'),
@@ -165,79 +240,142 @@ class VIS_PT_panel(bpy.types.Panel):
             total = get_type_count(obj_type)
             visible = get_visible_count(obj_type=obj_type)
             locked = is_type_select_disabled(obj_type)
+            render_hidden = is_type_render_hidden(obj_type)
 
-            split = box.split(factor=0.5, align=True)
+            split = layout.split(factor=0.45, align=True)
             split.label(text=f"{label} ({total})", icon=icon)
 
             sub = split.row(align=True)
             sub.enabled = total > 0
             sub.operator("vis.toggle_type", text=str(visible), icon='HIDE_OFF',
                          depress=visible > 0).object_type = obj_type
+            sub.operator("vis.toggle_render", text="",
+                         icon='RESTRICT_RENDER_ON' if render_hidden else 'RESTRICT_RENDER_OFF',
+                         depress=render_hidden).object_type = obj_type
             sub.operator("vis.select_type", text="\u25ce").object_type = obj_type
             sub.operator("vis.lock_type", text="",
                          icon='RESTRICT_SELECT_ON' if locked else 'RESTRICT_SELECT_OFF',
                          depress=locked).object_type = obj_type
 
-        # --- By Name ---
-        box2 = layout.box()
-        box2.label(text="By Name", icon='SORTALPHA')
+
+class VIS_PT_name(bpy.types.Panel):
+    bl_label = "By Name"
+    bl_idname = "VIS_PT_name"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_category = "FILTER"
+    bl_parent_id = "VIS_PT_panel"
+    bl_order = 2
+
+    def draw(self, context):
+        layout = self.layout
         if _PLACEHOLDER_OK:
-            box2.prop(context.scene, "vis_name_pattern", text="", icon='VIEWZOOM',
-                      placeholder="Name pattern")
+            layout.prop(context.scene, "vis_name_pattern", text="", icon='VIEWZOOM',
+                        placeholder="Name pattern")
         else:
-            box2.prop(context.scene, "vis_name_pattern", text="", icon='VIEWZOOM')
+            layout.prop(context.scene, "vis_name_pattern", text="", icon='VIEWZOOM')
 
-        row2 = box2.row(align=True)
-        row2.operator("vis.toggle_name", text="Toggle")
-        row2.operator("vis.select_name", text="Select")
+        row2 = layout.row(align=True)
+        row2.operator("vis.toggle_name", text="Toggle", icon='HIDE_OFF')
+        row2.operator("vis.select_name", text="Select", icon='RESTRICT_SELECT_OFF')
 
-        # --- Collections ---
-        box3 = layout.box()
-        box3.label(text="Collections", icon='OUTLINER_COLLECTION')
 
+class VIS_PT_collections(bpy.types.Panel):
+    bl_label = "Collections"
+    bl_idname = "VIS_PT_collections"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_category = "FILTER"
+    bl_parent_id = "VIS_PT_panel"
+    bl_order = 3
+
+    def draw(self, context):
+        layout = self.layout
         for collection in bpy.data.collections:
             total = get_collection_obj_count(collection)
             if total == 0:
                 continue
 
             visible = get_visible_count(collection=collection)
+            render_hidden = is_collection_render_hidden(collection)
 
-            split = box3.split(factor=0.5, align=True)
+            split = layout.split(factor=0.45, align=True)
             split.label(text=f"{collection.name} ({total})")
 
             sub = split.row(align=True)
             sub.operator("vis.toggle_collection", text=str(visible), icon='HIDE_OFF',
                          depress=visible > 0).collection_name = collection.name
+            sub.operator("vis.toggle_render", text="",
+                         icon='RESTRICT_RENDER_ON' if render_hidden else 'RESTRICT_RENDER_OFF',
+                         depress=render_hidden).collection_name = collection.name
             sub.operator("vis.select_collection", text="\u25ce").collection_name = collection.name
 
-        # --- By Modifier ---
+
+class VIS_PT_modifiers(bpy.types.Panel):
+    bl_label = "By Modifier"
+    bl_idname = "VIS_PT_modifiers"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_category = "FILTER"
+    bl_parent_id = "VIS_PT_panel"
+    bl_order = 4
+
+    def draw(self, context):
+        layout = self.layout
         mod_mode = context.scene.vis_mod_mode
         mod_scope = context.scene.vis_mod_scope
-        mod_groups = get_modifier_groups(mod_mode, iter_scope_objects(context, mod_scope))
-        if mod_groups:
-            box4 = layout.box()
-            head = box4.row(align=True)
-            head.label(text="By Modifier", icon='MODIFIER')
-            head.prop(context.scene, "vis_mod_scope", text="")
-            head.prop(context.scene, "vis_mod_mode", text="")
+        scope_objects = iter_scope_objects(context, mod_scope)
+        mod_groups = get_modifier_groups(mod_mode, scope_objects)
 
-            for key, display, mod_type, count in mod_groups:
-                split = box4.split(factor=0.5, align=True)
-                split.label(text=f"{display} ({count})", icon=get_mod_icon(mod_type))
+        head = layout.row(align=True)
+        head.prop(context.scene, "vis_mod_scope", text="")
+        head.prop(context.scene, "vis_mod_mode", text="")
 
-                sub = split.row(align=True)
-                op_sel = sub.operator("vis.select_mods", text="\u25ce")
-                op_sel.match_key = key
-                op_sel.match_by = mod_mode
-                op_sel.match_scope = mod_scope
-                op_app = sub.operator("vis.apply_mod", text="", icon='CHECKMARK')
-                op_app.match_key = key
-                op_app.match_by = mod_mode
-                op_app.match_scope = mod_scope
-                op_del = sub.operator("vis.remove_mod", text="", icon='X')
-                op_del.match_key = key
-                op_del.match_by = mod_mode
-                op_del.match_scope = mod_scope
+        if not mod_groups:
+            if mod_scope == 'SELECTED':
+                if not context.selected_objects:
+                    layout.label(text="Nothing selected", icon='INFO')
+                else:
+                    layout.label(text="No modifiers on selected", icon='INFO')
+            return
+
+        group_diffs = get_group_diffs(mod_groups, mod_mode, scope_objects)
+
+        for key, display, mod_type, count in mod_groups:
+            split = layout.split(factor=0.45, align=True)
+            split.label(text=f"{display} ({count})", icon=get_mod_icon(mod_type))
+
+            sub = split.row(align=True)
+            op_sel = sub.operator("vis.select_mods", text="\u25ce")
+            op_sel.match_key = key
+            op_sel.match_by = mod_mode
+            op_sel.match_scope = mod_scope
+            op_app = sub.operator("vis.apply_mod", text="", icon='CHECKMARK')
+            op_app.match_key = key
+            op_app.match_by = mod_mode
+            op_app.match_scope = mod_scope
+            op_del = sub.operator("vis.remove_mod", text="", icon='X')
+            op_del.match_key = key
+            op_del.match_by = mod_mode
+            op_del.match_scope = mod_scope
+
+            outliers = group_diffs.get(key, 0)
+            if outliers:
+                drow = layout.row(align=True)
+                drow.label(text=f"{outliers} with different settings", icon='ERROR')
+                op_dif = drow.operator("vis.select_mod_diffs", text="\u25ce")
+                op_dif.match_key = key
+                op_dif.match_by = mod_mode
+                op_dif.match_scope = mod_scope
+
+        disabled = 0
+        for obj in scope_objects:
+            if obj.library is None:
+                disabled += sum(1 for m in obj.modifiers if not m.show_viewport)
+        if disabled:
+            op_dis = layout.operator("vis.remove_disabled",
+                                     text=f"Remove disabled ({disabled})", icon='X')
+            op_dis.match_scope = mod_scope
 
 
 # --- Operators: Toggle Type ---
@@ -245,12 +383,30 @@ class VIS_PT_panel(bpy.types.Panel):
 class VIS_OT_toggle_type(bpy.types.Operator):
     bl_idname = "vis.toggle_type"
     bl_label = "Toggle Type Visibility"
-    bl_description = "Hide/show all objects of this type (viewport and render)"
+    bl_description = ("Hide/show all objects of this type (viewport and render). "
+                      "Shift+Click: solo — hide everything except this type")
     bl_options = {'REGISTER', 'UNDO'}
 
     object_type: bpy.props.StringProperty()
+    solo: bpy.props.BoolProperty(
+        name="Solo",
+        description="Hide everything except this type",
+        default=False,
+    )
+
+    def invoke(self, context, event):
+        self.solo = event.shift
+        return self.execute(context)
 
     def execute(self, context):
+        if self.solo:
+            for obj in bpy.data.objects:
+                want = obj.type == self.object_type
+                obj.hide_viewport = not want
+                obj.hide_render = not want
+            self.report({'INFO'}, f"Solo {self.object_type.title()}: everything else hidden")
+            return {'FINISHED'}
+
         hidden = is_type_hidden(self.object_type)
         for obj in bpy.data.objects:
             if obj.type == self.object_type:
@@ -294,6 +450,40 @@ class VIS_OT_lock_type(bpy.types.Operator):
         for obj in bpy.data.objects:
             if obj.type == self.object_type:
                 obj.hide_select = not locked
+        return {'FINISHED'}
+
+
+# --- Operators: Toggle Render (Type / Collection) ---
+
+class VIS_OT_toggle_render(bpy.types.Operator):
+    bl_idname = "vis.toggle_render"
+    bl_label = "Toggle Render Visibility"
+    bl_description = ("Exclude/restore this group in renders (camera icon). "
+                      "Viewport visibility is not affected")
+    bl_options = {'REGISTER', 'UNDO'}
+
+    object_type: bpy.props.StringProperty(default="")
+    collection_name: bpy.props.StringProperty(default="")
+
+    @classmethod
+    def poll(cls, context):
+        return context.mode == 'OBJECT'
+
+    def execute(self, context):
+        if self.collection_name:
+            collection = bpy.data.collections.get(self.collection_name)
+            if not collection:
+                self.report({'WARNING'}, f"Collection '{self.collection_name}' not found")
+                return {'CANCELLED'}
+            hidden = is_collection_render_hidden(collection)
+            for obj in collection.objects:
+                obj.hide_render = not hidden
+            return {'FINISHED'}
+
+        hidden = is_type_render_hidden(self.object_type)
+        for obj in bpy.data.objects:
+            if obj.type == self.object_type:
+                obj.hide_render = not hidden
         return {'FINISHED'}
 
 
@@ -351,16 +541,34 @@ class VIS_OT_select_name(bpy.types.Operator):
 class VIS_OT_toggle_collection(bpy.types.Operator):
     bl_idname = "vis.toggle_collection"
     bl_label = "Toggle Collection Visibility"
-    bl_description = "Hide/show all objects of this collection (viewport and render)"
+    bl_description = ("Hide/show all objects of this collection (viewport and render). "
+                      "Shift+Click: solo — hide everything except this collection")
     bl_options = {'REGISTER', 'UNDO'}
 
     collection_name: bpy.props.StringProperty()
+    solo: bpy.props.BoolProperty(
+        name="Solo",
+        description="Hide everything except this collection",
+        default=False,
+    )
+
+    def invoke(self, context, event):
+        self.solo = event.shift
+        return self.execute(context)
 
     def execute(self, context):
         collection = bpy.data.collections.get(self.collection_name)
         if not collection:
             self.report({'WARNING'}, f"Collection '{self.collection_name}' not found")
             return {'CANCELLED'}
+
+        if self.solo:
+            for obj in bpy.data.objects:
+                want = obj.name in collection.objects
+                obj.hide_viewport = not want
+                obj.hide_render = not want
+            self.report({'INFO'}, f"Solo '{collection.name}': everything else hidden")
+            return {'FINISHED'}
 
         hidden = is_collection_hidden(collection)
         for obj in collection.objects:
@@ -422,6 +630,47 @@ class VIS_OT_select_mods(bpy.types.Operator):
                         count += 1
                     break
         self.report({'INFO'}, f"Selected {count} object(s)")
+        return {'FINISHED'}
+
+
+class VIS_OT_select_mod_diffs(bpy.types.Operator):
+    bl_idname = "vis.select_mod_diffs"
+    bl_label = "Select Objects with Different Settings"
+    bl_description = ("Select the objects whose modifier settings differ from "
+                      "the majority of the group")
+    bl_options = {'REGISTER', 'UNDO'}
+
+    match_key: bpy.props.StringProperty()
+    match_by: bpy.props.StringProperty(default='NAME')
+    match_scope: bpy.props.StringProperty(default='SCENE')
+
+    @classmethod
+    def poll(cls, context):
+        return context.mode == 'OBJECT'
+
+    def execute(self, context):
+        fps = []
+        for obj in iter_scope_objects(context, self.match_scope):
+            if obj.library is not None:
+                continue
+            for mod in obj.modifiers:
+                if (self.match_by == 'NAME' and mod.name == self.match_key) or \
+                   (self.match_by == 'TYPE' and mod.type == self.match_key):
+                    fps.append((obj, mod_fingerprint(mod)))
+                    break
+
+        if not fps:
+            self.report({'WARNING'}, "No objects with this modifier")
+            return {'CANCELLED'}
+
+        common = Counter(f for _, f in fps).most_common(1)[0][0]
+        bpy.ops.object.select_all(action='DESELECT')
+        count = 0
+        for obj, f in fps:
+            if f != common and not obj.hide_viewport and obj.name in context.view_layer.objects:
+                obj.select_set(True)
+                count += 1
+        self.report({'INFO'}, f"Selected {count} object(s) with different settings")
         return {'FINISHED'}
 
 
@@ -568,20 +817,54 @@ class VIS_OT_remove_mod(bpy.types.Operator):
         return {'FINISHED'}
 
 
+class VIS_OT_remove_disabled(bpy.types.Operator):
+    bl_idname = "vis.remove_disabled"
+    bl_label = "Remove Disabled Modifiers"
+    bl_description = ("Remove every modifier that is disabled in the viewport "
+                      "(monitor off in the stack) across the current scope. "
+                      "Library-linked objects are skipped")
+    bl_options = {'REGISTER', 'UNDO'}
+
+    match_scope: bpy.props.StringProperty(default='SCENE')
+
+    @classmethod
+    def poll(cls, context):
+        return context.mode == 'OBJECT'
+
+    def execute(self, context):
+        count = 0
+        for obj in iter_scope_objects(context, self.match_scope):
+            if obj.library is not None:
+                continue
+            for mod in list(obj.modifiers):
+                if not mod.show_viewport:
+                    obj.modifiers.remove(mod)
+                    count += 1
+        self.report({'INFO'}, f"Removed {count} disabled modifier(s)")
+        return {'FINISHED'}
+
+
 # --- Registration ---
 
 classes = [
     VIS_PT_panel,
+    VIS_PT_type,
+    VIS_PT_name,
+    VIS_PT_collections,
+    VIS_PT_modifiers,
     VIS_OT_toggle_type,
     VIS_OT_select_type,
     VIS_OT_lock_type,
+    VIS_OT_toggle_render,
     VIS_OT_toggle_name,
     VIS_OT_select_name,
     VIS_OT_toggle_collection,
     VIS_OT_select_collection,
     VIS_OT_select_mods,
+    VIS_OT_select_mod_diffs,
     VIS_OT_apply_mod,
     VIS_OT_remove_mod,
+    VIS_OT_remove_disabled,
 ]
 
 
