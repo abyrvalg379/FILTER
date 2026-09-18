@@ -48,7 +48,7 @@ zip -r ../out/filter.zip object_filter/
 
 ## Screenshot
 
-![FILTER](work/screen/Screenshot_1.jpg)
+![FILTER panel](work/screen/panel.png)
 
 ## License
 

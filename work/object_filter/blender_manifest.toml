@@ -1,7 +1,7 @@
 schema_version = "1.0.0"
 
 id = "object_filter"
-version = "1.4.0"
+version = "1.4.1"
 name = "FILTER"
 tagline = "Toggle visibility and bulk manage modifiers across the scene"
 maintainer = "Maksim Kovalev <mkova@users.noreply.github.com>"
