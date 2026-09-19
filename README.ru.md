@@ -27,12 +27,12 @@
 
 ### Blender 4.2+ (Extension)
 
-1. Скачайте `filter.zip` со страницы [Releases](../../releases)
+1. Скачайте `filter.zip` со страницы [последнего релиза](https://github.com/abyrvalg379/FILTER/releases/latest)
 2. Blender → Preferences → Get Extensions → Install from Disk → выберите `filter.zip`
 
 ### Blender 3.0+ (Addon)
 
-1. Скачайте `filter.zip` со страницы [Releases](../../releases)
+1. Скачайте `filter.zip` со страницы [последнего релиза](https://github.com/abyrvalg379/FILTER/releases/latest)
 2. Blender → Preferences → Add-ons → Install → выберите `filter.zip`
 
 ## Использование

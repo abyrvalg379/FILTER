@@ -27,12 +27,12 @@ Blender extension for quick object visibility and modifier management.
 
 ### Blender 4.2+ (Extension)
 
-1. Download `filter.zip` from [Releases](../../releases)
+1. Download `filter.zip` from the [latest release](https://github.com/abyrvalg379/FILTER/releases/latest)
 2. Blender → Preferences → Get Extensions → Install from Disk → select `filter.zip`
 
 ### Blender 3.0+ (Addon)
 
-1. Download `filter.zip` from [Releases](../../releases)
+1. Download `filter.zip` from the [latest release](https://github.com/abyrvalg379/FILTER/releases/latest)
 2. Blender → Preferences → Add-ons → Install → select `filter.zip`
 
 ## Usage
