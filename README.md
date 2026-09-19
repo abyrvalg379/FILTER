@@ -4,6 +4,8 @@
 
 Blender extension for quick object visibility and modifier management.
 
+*Документация на русском: [README.ru.md](README.ru.md)*
+
 ## Features
 
 - Toggle visibility by object type (Mesh, Armature, Empty, Light, Camera)
