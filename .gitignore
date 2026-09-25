@@ -26,3 +26,5 @@ desktop.ini
 # Build output
 out/
 work/test*
+docs/*.h1.json
+docs/*.entries.json
