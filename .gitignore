@@ -25,3 +25,4 @@ desktop.ini
 
 # Build output
 out/
+work/test*
