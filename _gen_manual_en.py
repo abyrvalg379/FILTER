@@ -4,10 +4,12 @@ Run:  python _gen_manual_en.py    Output:  docs\FILTER_Manual_EN.docx
 """
 
 import json
+import os
 
 import _docstyle as ds
 
-OUT = r'D:\AI\ZCode\Project\FILTER\docs\FILTER_Manual_EN.docx'
+OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                   'docs', 'FILTER_Manual_EN.docx')
 
 
 def h1(doc, text):
